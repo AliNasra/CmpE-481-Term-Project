@@ -118,7 +118,9 @@ original_features = X.columns.tolist()
 ## Dividing the data by 0.8 - 0.2 ratio (training - testing)
 X_train , X_test, y_train, y_test = train_test_split(X, y_numeric, test_size=0.2, random_state=0)
 num_folds = 5
+print("Random Forest")
 apply_randomForest(X_train,y_train)
+print("XGBoost")
 apply_XGBoost(X_train,y_train)
 
 """
