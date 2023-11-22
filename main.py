@@ -5,7 +5,12 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import KFold,cross_val_score
+from sklearn.model_selection import RandomizedSearchCV
+import xgboost as xgb
+from sklearn.metrics import accuracy_score
+
+
+
 
 
 
@@ -54,23 +59,38 @@ def apply_svm(X_train_t, y_train_t, X_val, y_val, X_test, y_test):
 
     return accuracy_val, accuracy_test, test_report
 
-def apply_randomForest(X_train, y_train, kf):
-    X_pre = preprocess(X_train, y_train)    # whole training set or 0.8 of the training set
-    #X_train_t , X_val, y_train_t, y_val = train_test_split(X_pre, y_train, test_size=0.2, random_state=0)
-    accuracy_scores = {}
-    
-    for max_depth in range(2,10,1):
-        for n_estimators in range (10,200,10):
-            for min_samples_leaf in range(1,10,1):
-                clf = RandomForestClassifier(max_depth=max_depth,n_estimators = n_estimators,min_samples_leaf = min_samples_leaf, random_state=0)  
-                scores = cross_val_score(clf, X_pre, y_train, cv = kf)
-                accuracy_scores[clf] = scores.mean()
-                print("Max_depth is ", max_depth, "n_estimators is ", n_estimators," min_samples_leaf is  ",min_samples_leaf)
-                print("Score is ",scores.mean())
-        #test_report = classification_report(y_test, y_pred_test)
-    #return accuracy_list
-    #return accuracy_val, accuracy_test, test_report
-    
+def apply_randomForest(X_train, y_train):
+    X_train_t , X_val, y_train_t, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    X_train_processed = preprocess(X_train_t, y_train_t)    # 0.8 of the training set 
+    clf = RandomForestClassifier()
+    param_grid = {
+    'n_estimators': [10, 20, 40, 50, 60, 80, 100, 120, 150, 200],
+    'max_depth': [None, 10, 20, 30],
+    'min_samples_split': [2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'min_samples_leaf': [1, 2, 3, 4, 5]
+    }
+    # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
+    random_search.fit(X_train_processed, y_train_t)
+    y_pred = random_search.predict(X_val)
+    accuracy = accuracy_score(y_val,y_pred)
+    print("Accuracy: {:.2f}%".format(accuracy * 100))  
+
+def apply_XGBoost(X_train, y_train):
+    X_train_t , X_val, y_train_t, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    X_train_processed = preprocess(X_train_t, y_train_t)    # 0.8 of the training set 
+    clf = xgb.XGBClassifier(objective='multi:softmax', num_class=3, seed=42)
+    param_grid = {
+        'max_depth': [1,2, 3, 4, 5, 6, 7],
+        'learning_rate': [0.1, 0.01, 0.001],
+        'n_estimators': [20, 50, 70, 100, 120, 150, 200],
+    }
+    # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
+    random_search.fit(X_train_processed, y_train_t)
+    y_pred = random_search.predict(X_val)
+    accuracy = accuracy_score(y_val,y_pred)
+    print("Accuracy: {:.2f}%".format(accuracy * 100))  
 
 
 data = pd.read_csv('star_classification.csv', index_col=0)
@@ -84,11 +104,11 @@ y_numeric = label_encoder.fit_transform(y)
 
 original_features = X.columns.tolist()
 
-## Dividing the data by 0.8*0.8 - 0.8*0.2 - 0.2 ratio (training - validation - testing)
+## Dividing the data by 0.8 - 0.2 ratio (training - testing)
 X_train , X_test, y_train, y_test = train_test_split(X, y_numeric, test_size=0.2, random_state=0)
 num_folds = 5
-kf = KFold(n_splits=num_folds, shuffle=True, random_state=42)
-apply_randomForest(X_train,y_train,kf)
+apply_randomForest(X_train,y_train)
+apply_XGBoost(X_train,y_train)
 
 """
 svm_accuracy_val, svm_accuracy_test, svm_test_report = apply_svm(X_train_t, y_train_t, X_val, y_val, X_test, y_test)
