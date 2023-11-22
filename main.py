@@ -8,6 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import RandomizedSearchCV
 import xgboost as xgb
 from sklearn.metrics import accuracy_score
+import numpy as np
 
 
 
@@ -64,14 +65,19 @@ def apply_randomForest(X_train, y_train):
     X_train_processed = preprocess(X_train_t, y_train_t)    # 0.8 of the training set 
     clf = RandomForestClassifier()
     param_grid = {
-    'n_estimators': [10, 20, 40, 50, 60, 80, 100, 120, 150, 200],
+    'n_estimators': [10, 50, 100, 200],
     'max_depth': [None, 10, 20, 30],
-    'min_samples_split': [2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'min_samples_split': [2, 5, 10],
     'min_samples_leaf': [1, 2, 3, 4, 5]
     }
     # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
     random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
     random_search.fit(X_train_processed, y_train_t)
+    results = random_search.cv_results_
+    print("Average Test Score: {:.2f}".format(np.mean(results['mean_test_score'])))
+    print("Standard Deviation of Test Scores: {:.2f}".format(np.std(results['mean_test_score'])))
+    eliminated_columns = [feature for feature in X_val.columns if feature not in X_train_processed.columns ]
+    X_val = X_val.drop(eliminated_columns, axis=1)
     y_pred = random_search.predict(X_val)
     accuracy = accuracy_score(y_val,y_pred)
     print("Accuracy: {:.2f}%".format(accuracy * 100))  
@@ -81,13 +87,18 @@ def apply_XGBoost(X_train, y_train):
     X_train_processed = preprocess(X_train_t, y_train_t)    # 0.8 of the training set 
     clf = xgb.XGBClassifier(objective='multi:softmax', num_class=3, seed=42)
     param_grid = {
-        'max_depth': [1,2, 3, 4, 5, 6, 7],
+        'max_depth': [1, 3, 6, 7],
         'learning_rate': [0.1, 0.01, 0.001],
-        'n_estimators': [20, 50, 70, 100, 120, 150, 200],
+        'n_estimators': [20, 50, 100, 150, 200],
     }
     # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
     random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
     random_search.fit(X_train_processed, y_train_t)
+    results = random_search.cv_results_
+    print("Average Test Score: {:.2f}".format(np.mean(results['mean_test_score'])))
+    print("Standard Deviation of Test Scores: {:.2f}".format(np.std(results['mean_test_score'])))
+    eliminated_columns = [feature for feature in X_val.columns if feature not in X_train_processed.columns ]
+    X_val = X_val.drop(eliminated_columns, axis=1)
     y_pred = random_search.predict(X_val)
     accuracy = accuracy_score(y_val,y_pred)
     print("Accuracy: {:.2f}%".format(accuracy * 100))  
