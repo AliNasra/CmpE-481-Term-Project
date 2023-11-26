@@ -6,6 +6,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import RandomizedSearchCV
 import numpy as np
+import os
 
 
 def preprocess(X, y):
@@ -44,16 +45,16 @@ def param_tuning_svm(X_train, y_train):
     param_grid = {
     'kernel': ['linear','poly','rbf','sigmoid'],
     'C':  [0.01, 0.1, 1, 10, 100],
-    'gamma': ['scale', 'auto', 1, 0.1],
     }
     """
+    'gamma': ['scale', 'auto', 1, 0.1],
     'coef0':[0.0, 0.1, 0.2, 0.3],
     'degree':[2, 3, 4, 5]
     """
 
     clf = SVC()
 
-    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=5, cv=5, scoring='accuracy', random_state=42, n_jobs=-1)
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=5, cv=5, scoring='accuracy', random_state=42, n_jobs=os.cpu_count()-1)
     random_search.fit(X_train_t_pre, y_train_t)
 
     results = random_search.cv_results_
@@ -77,11 +78,13 @@ def param_tuning_svm(X_train, y_train):
     best_params = {
     'kernel': best_kernel,
     'C':  random_search.best_params_['C'],
+    }
+    """
     'gamma': 'scale',
     'coef0':0.0,
     'degree':3
-    }
-
+    """
+    """
     # gamma exists if best kernel is rbf or poly or sigmoid
     # coef0 exists if best kernel is poly or sigmoid
     # degree exists if best kernel is poly
@@ -99,7 +102,8 @@ def param_tuning_svm(X_train, y_train):
         best_params['degree'] = random_search.best_params_['degree']   
     else:
         return best_params
-    
+    """
+    return best_params
 
 # retrain model with the whole train set and predict on test set
 def apply_svm(X_train, X_test, y_train, y_test):
@@ -110,7 +114,7 @@ def apply_svm(X_train, X_test, y_train, y_test):
 
     X_train_pre = preprocess(X_train, y_train)  
 
-    clf = SVC(kernel=params['kernel'], C=params['C'], gamma=params['gamma'])#, coef0=params['coef0'], degree=params['degree']) 
+    clf = SVC(kernel=params['kernel'], C=params['C']) #, gamma=params['gamma'], coef0=params['coef0'], degree=params['degree']) 
     clf.fit(X_train_pre, y_train)
     y_pred_test = clf.predict(X_test)
 
