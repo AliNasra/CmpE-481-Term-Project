@@ -73,6 +73,8 @@ def apply_randomForest(X_train, y_train):
     # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
     random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
     random_search.fit(X_train_processed, y_train_t)
+    print("Best parameters used in Random Forest")
+    print(random_search.best_params_)
     results = random_search.cv_results_
     print("Average Test Score: {:.2f}".format(np.mean(results['mean_test_score'])))
     print("Standard Deviation of Test Scores: {:.2f}".format(np.std(results['mean_test_score'])))
@@ -94,6 +96,8 @@ def apply_XGBoost(X_train, y_train):
     # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
     random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
     random_search.fit(X_train_processed, y_train_t)
+    print("Best parameters used in XGBoost")
+    print(random_search.best_params_)
     results = random_search.cv_results_
     print("Average Test Score: {:.2f}".format(np.mean(results['mean_test_score'])))
     print("Standard Deviation of Test Scores: {:.2f}".format(np.std(results['mean_test_score'])))
