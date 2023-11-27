@@ -6,7 +6,12 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import RandomizedSearchCV
 import numpy as np
-import os
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+from imblearn.over_sampling import SMOTE
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
 
 
 def preprocess(X, y):
@@ -43,8 +48,8 @@ def param_tuning_svm(X_train, y_train):
     X_train_t_pre = preprocess(X_train_t, y_train_t)  # 0.8 of the training set 
 
     param_grid = {
-    'kernel': ['linear','poly','rbf','sigmoid'],
-    'C':  [0.01, 0.1, 1, 10, 100],
+        'kernel' : ['linear', 'poly', 'rbf'],
+        'C':  [0.01, 0.1, 1],
     }
     """
     'gamma': ['scale', 'auto', 1, 0.1],
@@ -53,13 +58,13 @@ def param_tuning_svm(X_train, y_train):
     """
 
     clf = SVC()
+    grid_search = GridSearchCV(estimator=clf, param_grid=param_grid, cv=5, n_jobs=-2)
 
-    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=5, cv=5, scoring='accuracy', random_state=42, n_jobs=os.cpu_count()-1)
-    random_search.fit(X_train_t_pre, y_train_t)
+    grid_search.fit(X_train_t_pre, y_train_t)
+    print("training model done")
+    results = grid_search.cv_results_
 
-    results = random_search.cv_results_
-
-    print("Best parameters : ", random_search.best_params_)
+    print("Best parameters : ", grid_search.best_params_)
     print("Average Score for Validation Set : {:.2f}".format(np.mean(results['mean_test_score'])))
     print("Standard Deviation of Scores for Validation Set: {:.2f}".format(np.std(results['mean_test_score'])))
 
@@ -67,44 +72,23 @@ def param_tuning_svm(X_train, y_train):
     eliminated_columns = [feature for feature in X_val.columns if feature not in X_train_t_pre.columns ]
     X_val = X_val.drop(eliminated_columns, axis=1)
 
-    y_pred_val = random_search.predict(X_val)
+    y_pred_val = grid_search.predict(X_val)
     accuracy_val = accuracy_score(y_val, y_pred_val)
     print("Accuracy for Validation Set: {:.2f}%".format(accuracy_val * 100))  
-    #val_report = classification_report(y_val, y_pred_val)
-    #print(f"Classification report for validation set : {val_report}")
+    val_report = classification_report(y_val, y_pred_val)
+    print("Classification report for validation set :")
+    print(val_report)
 
-    # Best Parameters
-    best_kernel = random_search.best_params_['kernel']
-    best_params = {
-    'kernel': best_kernel,
-    'C':  random_search.best_params_['C'],
-    }
     """
-    'gamma': 'scale',
-    'coef0':0.0,
-    'degree':3
+    # randomized search cv
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=3, cv=5, scoring='accuracy', random_state=42, n_jobs=-2)
+    print("random search done")
+    random_search.fit(X_train_t_pre, y_train_t)
     """
-    """
-    # gamma exists if best kernel is rbf or poly or sigmoid
-    # coef0 exists if best kernel is poly or sigmoid
-    # degree exists if best kernel is poly
-    if best_kernel!='linear':   # might be rbf or poly or sigmoid
-        best_params['gamma'] = random_search.best_params_['gamma']    
-    else:
-        return best_params
-    
-    if best_kernel != 'rbf':   # might be poly or sigmoid
-        best_params['coef0'] = random_search.best_params_['coef0']   
-    else:
-        return best_params  
-         
-    if best_kernel != 'sigmoid':   # is poly
-        best_params['degree'] = random_search.best_params_['degree']   
-    else:
-        return best_params
-    """
-    return best_params
 
+    return grid_search.best_params_
+
+"""
 # retrain model with the whole train set and predict on test set
 def apply_svm(X_train, X_test, y_train, y_test):
     eliminated_columns = [feature for feature in X_test.columns if feature not in X_train.columns ]
@@ -122,6 +106,119 @@ def apply_svm(X_train, X_test, y_train, y_test):
     print("Accuracy for Test Set: {:.2f}%".format(accuracy_test * 100))  
     #test_report = classification_report(y_test, y_pred_test)
     #print(f"Classification report for test set : {test_report}")
+"""
+
+def param_tuning_svm_pca(X_train, y_train):
+    X_train_t , X_val, y_train_t, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    X_train_t_pre = preprocess(X_train_t, y_train_t)  # 0.8 of the training set 
+
+    pca = PCA()
+    svm = SVC()
+    pipe = Pipeline([('pca', pca), ('svm', svm)])
+
+    param_grid = {
+        'pca__n_components': [2, 3, 4], 
+        'svm__C': [0.01, 0.1, 1], 
+        'svm__gamma': ['scale', 'auto'],  # Kernel coefficient for 'rbf' kernel
+        'svm__kernel': ['linear', 'rbf']  # SVM kernel type
+    }
+
+    random_search = RandomizedSearchCV(estimator=pipe, param_distributions=param_grid,
+                                   scoring='accuracy', cv=5, random_state=42, n_iter=10, n_jobs=-2)
+
+    random_search.fit(X_train_t_pre, y_train_t)
+    print("training model done")
+
+    best_estimator = random_search.best_estimator_
+    results = random_search.cv_results_
+
+    print("Best parameters : ", random_search.best_params_)
+    print("Average Score for Validation Set : {:.2f}".format(np.mean(results['mean_test_score'])))
+    print("Standard Deviation of Scores for Validation Set: {:.2f}".format(np.std(results['mean_test_score'])))
+
+    # For validation set
+    eliminated_columns = [feature for feature in X_val.columns if feature not in X_train_t_pre.columns ]
+    X_val = X_val.drop(eliminated_columns, axis=1)
+
+    y_pred_val = random_search.predict(X_val)
+    accuracy_val = accuracy_score(y_val, y_pred_val)
+    print("Accuracy for Validation Set: {:.2f}%".format(accuracy_val * 100))  
+    val_report = classification_report(y_val, y_pred_val)
+    print("Classification report for validation set :")
+    print(val_report)
+
+
+def param_tuning_k_nearest_neighbour(X_train, y_train):
+    X_train_t , X_val, y_train_t, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    X_train_t_pre = preprocess(X_train_t, y_train_t)  # 0.8 of the training set 
+
+    clf = KNeighborsClassifier()
+    param_grid = {
+        'n_neighbors': [7, 9, 11, 13, 15],
+        'p': [1, 2],   
+        # p : Minkowski metric                     
+        # p = 1: Manhattan distance (L1 norm)  
+        # p = 2: Euclidean distance (L2 norm)
+        'weights' : ['uniform', 'distance'],
+        'algorithm' : ['auto', 'ball_tree', 'kd_tree', 'brute'],
+        'leaf_size' : [30, 90, 150, 210],
+        'metric' : ["euclidean","manhattan","chebyshev","minkowski"]
+    }  
+    
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, cv=5, scoring='accuracy', random_state=42, n_jobs=-2)
+
+    random_search.fit(X_train_t_pre, y_train_t)
+
+    results = random_search.cv_results_
+
+    print("Best parameters : ", random_search.best_params_)
+    print("Average Score for Validation Set : {:.2f}".format(np.mean(results['mean_test_score'])))
+    print("Standard Deviation of Scores for Validation Set: {:.2f}".format(np.std(results['mean_test_score'])))
+
+    # For validation set
+    eliminated_columns = [feature for feature in X_val.columns if feature not in X_train_t_pre.columns ]
+    X_val = X_val.drop(eliminated_columns, axis=1)
+  
+    y_pred_val = random_search.predict(X_val)
+
+    accuracy_val = accuracy_score(y_val, y_pred_val)
+    print("Accuracy for Validation Set: {:.2f}%".format(accuracy_val * 100))  
+    val_report = classification_report(y_val, y_pred_val)
+    print("Classification report for validation set :")
+    print(val_report)
+
+
+def param_tuning_adaboost(X_train, y_train):
+    X_train_t , X_val, y_train_t, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    X_train_t_pre = preprocess(X_train_t, y_train_t)  # 0.8 of the training set 
+
+    clf = AdaBoostClassifier()  
+    param_grid = {
+        'n_estimators': [10, 50, 100, 200],
+        'learning_rate': [0.01, 0.1, 0.5, 1.0],
+    }  
+    
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, cv=5, scoring='accuracy', random_state=42, n_jobs=-2)
+
+    random_search.fit(X_train_t_pre, y_train_t)
+
+    results = random_search.cv_results_
+
+    print("Best parameters : ", random_search.best_params_)
+    print("Average Score for Validation Set : {:.2f}".format(np.mean(results['mean_test_score'])))
+    print("Standard Deviation of Scores for Validation Set: {:.2f}".format(np.std(results['mean_test_score'])))
+
+    # For validation set
+    eliminated_columns = [feature for feature in X_val.columns if feature not in X_train_t_pre.columns ]
+    X_val = X_val.drop(eliminated_columns, axis=1)
+  
+    y_pred_val = random_search.predict(X_val)
+
+    accuracy_val = accuracy_score(y_val, y_pred_val)
+    print("Accuracy for Validation Set: {:.2f}%".format(accuracy_val * 100))  
+    val_report = classification_report(y_val, y_pred_val, zero_division=1)
+    print("Classification report for validation set :")
+    print(val_report)
 
 
 data = pd.read_csv('star_classification.csv', index_col=0)
@@ -132,11 +229,18 @@ y = data.loc[:,"class"]
 label_encoder = LabelEncoder()
 y_numeric = label_encoder.fit_transform(y)
 # 'GALAXY': 0  'QSO': 1  'STAR': 2
+# class_weights = {0: 0.59, 1: 0.22, 2: 0.19}
 
 original_features = X.columns.tolist()
 
 ## Dividing the data by 0.8*0.8 - 0.8*0.2 - 0.2 ratio (training - validation - testing)
 X_train , X_test, y_train, y_test = train_test_split(X, y_numeric, test_size=0.2, random_state=0)
   
-print("SVM")
-apply_svm(X_train, X_test, y_train, y_test)
+print("K-Nearest Neighbor")
+param_tuning_k_nearest_neighbour(X_train, y_train)
+
+#print("SVM")
+#param_tuning_svm_pca(X_train, y_train)
+
+print("AdaBoost")
+param_tuning_adaboost(X_train, y_train)
