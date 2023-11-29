@@ -9,10 +9,7 @@ from sklearn.model_selection import RandomizedSearchCV
 import xgboost as xgb
 from sklearn.metrics import accuracy_score
 import numpy as np
-
-
-
-
+import matplotlib.pyplot as plt
 
 
 def preprocess(X, y):
@@ -71,8 +68,20 @@ def apply_randomForest(X_train, y_train):
     'min_samples_leaf': [1, 2, 3, 4, 5]
     }
     # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
-    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
+    random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42, n_jobs=-2)
     random_search.fit(X_train_processed, y_train_t)
+
+    best_rf_estimator = random_search.best_estimator_
+    feature_importances = best_rf_estimator.feature_importances_
+
+    f, ax = plt.subplots(figsize=(10, 7))
+    ax.barh(range(len(feature_importances)), feature_importances, color='midnightblue', alpha=.7)
+    ax.set_yticks(range(len(feature_importances)))
+    ax.set_yticklabels(X_train_processed.columns)
+    ax.set_title("Importance of each feature")
+    ax.set_xlabel("Importance")
+    plt.show()
+
     print("Best parameters used in Random Forest")
     print(random_search.best_params_)
     results = random_search.cv_results_
@@ -83,6 +92,7 @@ def apply_randomForest(X_train, y_train):
     y_pred = random_search.predict(X_val)
     accuracy = accuracy_score(y_val,y_pred)
     print("Accuracy: {:.2f}%".format(accuracy * 100))  
+
 
 def apply_XGBoost(X_train, y_train):
     X_train_t , X_val, y_train_t, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
@@ -96,6 +106,18 @@ def apply_XGBoost(X_train, y_train):
     # Use RandomizedSearchCV to search for the best parameters and perform k-fold cross-validation
     random_search = RandomizedSearchCV(estimator=clf, param_distributions=param_grid, n_iter=10, cv=5, scoring='accuracy', random_state=42)
     random_search.fit(X_train_processed, y_train_t)
+
+    best_rf_estimator = random_search.best_estimator_
+    feature_importances = best_rf_estimator.feature_importances_
+
+    f, ax = plt.subplots(figsize=(10, 7))
+    ax.barh(range(len(feature_importances)), feature_importances, color='midnightblue', alpha=.7)
+    ax.set_yticks(range(len(feature_importances)))
+    ax.set_yticklabels(X_train_processed.columns)
+    ax.set_title("Importance of each feature")
+    ax.set_xlabel("Importance")
+    plt.show()
+    
     print("Best parameters used in XGBoost")
     print(random_search.best_params_)
     results = random_search.cv_results_
@@ -123,14 +145,6 @@ original_features = X.columns.tolist()
 X_train , X_test, y_train, y_test = train_test_split(X, y_numeric, test_size=0.2, random_state=0)
 num_folds = 5
 print("Random Forest")
-apply_randomForest(X_train,y_train)
+#apply_randomForest(X_train,y_train)
 print("XGBoost")
 apply_XGBoost(X_train,y_train)
-
-"""
-svm_accuracy_val, svm_accuracy_test, svm_test_report = apply_svm(X_train_t, y_train_t, X_val, y_val, X_test, y_test)
-
-print(f"Accuracy for validation set using svm: {svm_accuracy_val}")
-print(f"Accuracy for test set using svm: {svm_accuracy_test}")
-print(f"Classification report for test set using svm: {svm_test_report}")
-"""
